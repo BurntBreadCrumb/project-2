@@ -46,35 +46,65 @@ class_diag <- function(score, truth, positive, cutoff=.5){
 
 # Mining, Classification, Prediction
 
-## Name and EID here
+## Jennifer Chen
 
 ### Introduction 
 
-Paragraph or two introducing your datasets and variables, why they are interesting to you, etc. See instructions for more information
+***Paragraph or two introducing your datasets and variables, why they are interesting to you, etc. See instructions for more information
 
 ```{R}
 library(tidyverse)
-# read your datasets in here, e.g., with read_csv()
+plant_data<-read_csv("Plant Traits Data.csv")
+plant_data %>% head()
 
+sum(is.na(plant_data))
+plant_data %>% na.omit -> plant_data
+plant_data %>% summarize(n())
 # if your dataset needs tidying, do so here
-
-# any other code here
 ```
 
 ### Cluster Analysis
 
 ```{R}
 library(cluster)
-# clustering code here
+clust_data<-plant_data%>%dplyr::select(2:32)%>%na.omit()
+clust_data
+
+sil_width<-vector()
+for(i in 2:10){  
+  kms <- kmeans(clust_data,centers=i)
+  sil <- silhouette(kms$cluster,dist(clust_data))
+  sil_width[i]<-mean(sil[,3])
+}
+ggplot()+geom_line(aes(x=1:10,y=sil_width))+scale_x_continuous(name="k",breaks=1:10)
+pamdata<-clust_data %>% pam(k=2)
+pamdata
+pamdata$clustering
+
+pam_data2 <- clust_data %>% mutate(cluster = as.factor(pamdata$clustering))
+
+library(GGally)
+ggpairs(pam_data2, aes(color=as.factor(pamdata$clustering)), upper=NULL) #AGH IT'S TOO MANY GRAPHHHDSS BRRRRR #POGGERS
 ```
 
-Discussion of clustering here
+*Discussion of clustering here*
     
     
 ### Dimensionality Reduction with PCA
 
 ```{R}
-# PCA code here
+plant_nums<-plant_data %>% select_if(is.numeric) %>% scale()
+rownames(plant_nums) <- plant_data$X1
+plant_nums
+plant_pca<-princomp(plant_nums)
+plant_pca %>% names()
+plant_pca$loadings
+plant_df<-data.frame(PC1=plant_pca$loadings[,1],PC2=plant_pca$loadings[,2])
+plant_df %>% head()
+ggplot(plant_df, aes(PC1,PC2)) + geom_point() #add title and stuff
+
+library(factoextra)
+fviz_pca_biplot(plant_pca) #sick
 ```
 
 Discussions of PCA here. 
@@ -82,11 +112,32 @@ Discussions of PCA here.
 ###  Linear Classifier
 
 ```{R}
-# linear classifier code here
+fit <- glm(leafy ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, family="binomial")
+score <- predict(fit)
+score %>% round(3)
+class_diag(score,truth=plant_data$leafy, positive=1) #HMMMMMMM
+
+library(caret)
+knn_fit<-knn3(factor(leafy==1,levels=c("TRUE","FALSE")) ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, k=5)
+y_hat_knn<-predict(knn_fit,plant_data)
+y_hat_knn
+#NEEDS A CONFUSION MATRIX???
 ```
 
 ```{R}
-# cross-validation of linear classifier here
+k=10
+data<-plant_data[sample(nrow(plant_data)),]
+folds<-cut(seq(1:nrow(plant_data)),breaks=k,labels=F)
+diags<-NULL
+for(i in 1:k){
+  train<-data[folds!=i,]
+  test<-data[folds==i,]
+  truth<-test$leafy
+}
+fit2 <- glm(leafy~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=train, family="binomial")
+probs<-predict(fit,newdata = test,type="response")
+diags<-rbind(diags,class_diag(probs,truth, positive=1))
+summarize_all(diags,mean)
 ```
 
 Discussion here
@@ -95,11 +146,37 @@ Discussion here
 
 ```{R}
 library(caret)
-# non-parametric classifier code here
+if (plant_data$leafy==1) {print ("leafy") } else {print ("not leafy") }
+plant_data$leafyTF <- ifelse(plant_data$leafy == 1, "leafy", "not_leafy")
+plant_data %>% glimpse()
+fit_npc<-train(leafyTF~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, method="rpart")
+library(rpart.plot)
+fit_npc
+rpart.plot(fit_npc$finalModel,digits=4)
+class_diag(predict(fit_npc,type="prob")[,2], plant_data$leafyTF, positive="leafy")
+#FIT MODEL TO DATASET
+cv <- trainControl(method="cv", number= 10, classProbs = T, savePredictions = T)
+fit_npc2 <- train(leafyTF ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, trControl=cv, method="rpart")
+fit_npc2$pred
+class_diag(fit_npc2$pred$leafy, fit_npc2$pred$obs, positive="leafy")
+#full model confusion matrix
+table(actual=plant_data$leafyTF,pred=predict(fit_npc2))[c(2,1),c(2,1)]
 ```
 
 ```{R}
-# cross-validation of np classifier here
+k=10
+data_npc<-plant_data[sample(nrow(plant_data)),]
+folds_npc<-cut(seq(1:nrow(plant_data)),breaks=k,labels=F)
+diags_npc<-NULL
+for(i in 1:k){
+  train_npc<-data[folds!=i,]
+  test_npc<-data[folds==i,]
+  truth_npc<-test$leafy
+}
+fit_npc3 <- knn3(leafy~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=train_npc)
+probs_npc<-predict(fit_npc3,newdata = test_npc)[,2]
+diags_npc<-rbind(diags_npc,class_diag(probs_npc,truth_npc, positive=1))
+summarize_all(diags_npc,mean)
 ```
 
 Discussion
@@ -108,11 +185,24 @@ Discussion
 ### Regression/Numeric Prediction
 
 ```{R}
-# regression model code here
+fit_lr <- lm(height~pdias+longindex+durflow+begflow+mycor+vegaer+vegsout+autopoll+insects,data=plant_data)
+yhat_lr <- predict(fit_lr)
+mean((plant_data$height-yhat_lr)^2)
 ```
 
 ```{R}
-# cross-validation of regression model here
+k=10
+data_lr <- plant_data[sample(nrow(plant_data)),]
+folds_lr <- cut(seq(1:nrow(plant_data)),breaks=k,label=F)
+diags_lr <- NULL
+for(i in 1:k){
+  train_lr <- data[folds!=i,]
+  test_lr <- data[folds==i,]
+  fit_lrcv <- lm(height~pdias+longindex+durflow+begflow+mycor+vegaer+vegsout+autopoll+insects,data=train)
+  yhat_lrcv <- predict(fit_lrcv,newdata=test_lr)
+  diags <- mean((test_lr$height-yhat_lrcv))
+}
+mean(diags)
 ```
 
 Discussion
@@ -131,7 +221,7 @@ Discussion
 
 ### Concluding Remarks
 
-Include concluding remarks here, if any
+*Include concluding remarks here, if any*
 
 
 
