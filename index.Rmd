@@ -50,24 +50,24 @@ class_diag <- function(score, truth, positive, cutoff=.5){
 
 ### Introduction 
 
-***Paragraph or two introducing your datasets and variables, why they are interesting to you, etc. See instructions for more information
+*The data I am using for data mining, classification, and prediction comes from the "plantTraits" dataset in R studio. I chose this dataset because it has 31 variables (including both numeric and binary variables) and 136 observations which opens up a lot of options for performing classification and prediction for specific variables or observations. 
+In order, the variables are pdias (diaspore mass in mg), longindex (seed bank longevity), durflow (flowering duration), height (plant height as an ordered factor), beglow (time of first flowering as an ordered factor), mycor (mycorrhizas-symbiotic relationship of plant and fungus-as an ordered factor), vegaer (aerial vegetative propagation as an ordered factor), vegsout (underground vegetative propagation as an ordered factor), autpoll (selfing pollination as an ordered factor), insects (insect pollination as an ordered factor), wind (wind pollination as an ordered factor), lign (woody plant), piq (thorny plant), ros (rosette plant), semiros (semi-rosette plant), leafy (leafy plant), suman (summer annual), winan (winter annual), monocarp (monocarpic perennial), polycarp (polycarpic perennial), seasaes (seasonal aestival leaves), seashiv (seasonal hibernal leaves), seasver (seasonal vernal leaves), everalw (evergreen leaves), everparti (partially evergreen leaves), elaio (fruits dispersed by ants), endozo (endozoochorous fruits), epizo (epizoochorous fruits), aquat (aquatic dispersal fruits), windgl (wind dispersed fruits), and unsp (unspecialized seed dispersal mechanism).*
 
 ```{R}
 library(tidyverse)
 plant_data<-read_csv("Plant Traits Data.csv")
-plant_data %>% head()
-
+plant_data %>% glimpse()
+plant_data %>% summarize(n())
 sum(is.na(plant_data))
 plant_data %>% na.omit -> plant_data
 plant_data %>% summarize(n())
-# if your dataset needs tidying, do so here
 ```
 
 ### Cluster Analysis
 
 ```{R}
 library(cluster)
-clust_data<-plant_data%>%dplyr::select(2:32)%>%na.omit()
+clust_data<-plant_data%>%dplyr::select(2:32)
 clust_data
 
 sil_width<-vector()
@@ -82,9 +82,15 @@ pamdata
 pamdata$clustering
 
 pam_data2 <- clust_data %>% mutate(cluster = as.factor(pamdata$clustering))
+pam_data2 %>% ggplot(aes(pdias,longindex,color=cluster)) + geom_point()
+plant_data%>%slice(pamdata$id.med)
+pam_data2 %>% group_by(cluster) %>% summarize_if(is.numeric,mean,na.rm=T)
+pamdata$silinfo$avg.width
+plot(pamdata,which=2) #greater than 0.71  a strong structure has been found
 
 library(GGally)
-ggpairs(pam_data2, aes(color=as.factor(pamdata$clustering)), upper=NULL) #AGH IT'S TOO MANY GRAPHHHDSS BRRRRR #POGGERS
+ggpairs(pam_data2[1:10], aes(color=as.factor(pamdata$clustering)), upper=NULL)
+#ggpairs(pam_data2, aes(color=as.factor(pamdata$clustering)), upper=NULL)
 ```
 
 *Discussion of clustering here*
@@ -211,10 +217,21 @@ Discussion
 
 ```{R}
 library(reticulate)
+use_python("/usr/bin/python3")
+
+cat(py$hi)
+cat(py$beep)
+cat(py$y_means)
 ```
 
 ```{python}
-# python code here
+hi="world"
+beep="boop"
+```
+
+
+```{python}
+
 ```
 
 Discussion
@@ -223,6 +240,8 @@ Discussion
 
 *Include concluding remarks here, if any*
 
+###Source
+Vallet, Jeanne (2005) Structuration de communautés végétales et analyse comparative de traits biologiques le long d'un gradient d'urbanisation. Mémoire de Master 2 'Ecologie-Biodiversité-Evolution'; Université Paris Sud XI, 30p.+ annexes (in french)
 
 
 
