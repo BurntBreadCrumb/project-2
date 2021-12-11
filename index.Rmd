@@ -230,10 +230,8 @@ mean(MSE)
 ```{R}
 library(reticulate)
 use_python("/usr/bin/python3")
-#py_install("matplotlib")
-#py_install("pandas")
-#py_install("numpy")
-#py_install("sklearn.cluster")
+plot <- import("matplotlib")
+plot$use("Agg", force = TRUE)
 ```
 
 ```{python}
@@ -242,13 +240,29 @@ r.plant_data["leafy"].head()
 leafy_py=r.plant_data["leafy"]
 ```
 
+```{r}
+cat(py$leafy_py)
+```
+
 *Using python and reticulate I opened the plant_data dataset in a python code chunk, indexed the variable "leafy", and then assigned it to "leafy_py". Then I accessed "leafy_py" in an r code chunk using py$.*
 
 ```{r}
-cat(py$leafy_py) 
+plant_data$pdias -> pdias
+plant_data$longindex -> long
 ```
 
+```{python}
+import matplotlib.pyplot as plt
+x=r.pdias
+y=r.long
+plt.scatter(x,y)
+plt.xlabel('pdias')
+plt.ylabel('longindex')
+plt.title('Longindex_vs_Pdias')
+plt.show()
+```
 
+*Using python and reticulate I made two vectors containing the first two variables of the plant_data dataset and then used the vectors in a python code chunk to create a scatterplot of pdias (diaspore mass) vs longindex (seed bank longevity).*
 
 ### Data Citation
 Vallet, Jeanne (2005) Structuration de communautés végétales et analyse comparative de traits biologiques le long d'un gradient d'urbanisation. Mémoire de Master 2 'Ecologie-Biodiversité-Evolution'; Université Paris Sud XI, 30p.+ annexes (in french)
