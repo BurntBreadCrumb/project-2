@@ -46,19 +46,20 @@ class_diag <- function(score, truth, positive, cutoff=.5){
 
 # Mining, Classification, Prediction
 
-## Jennifer Chen
+## Jennifer Chen (JC89777)
 
 ### Introduction 
 
-*The data I am using for data mining, classification, and prediction comes from the "plantTraits" dataset in R studio. I chose this dataset because it has 31 variables (including both numeric and binary variables) and 136 observations which opens up a lot of options for performing classification and prediction for specific variables or observations. 
-In order, the variables are pdias (diaspore mass in mg), longindex (seed bank longevity), durflow (flowering duration), height (plant height as an ordered factor), beglow (time of first flowering as an ordered factor), mycor (mycorrhizas-symbiotic relationship of plant and fungus-as an ordered factor), vegaer (aerial vegetative propagation as an ordered factor), vegsout (underground vegetative propagation as an ordered factor), autpoll (selfing pollination as an ordered factor), insects (insect pollination as an ordered factor), wind (wind pollination as an ordered factor), lign (woody plant), piq (thorny plant), ros (rosette plant), semiros (semi-rosette plant), leafy (leafy plant), suman (summer annual), winan (winter annual), monocarp (monocarpic perennial), polycarp (polycarpic perennial), seasaes (seasonal aestival leaves), seashiv (seasonal hibernal leaves), seasver (seasonal vernal leaves), everalw (evergreen leaves), everparti (partially evergreen leaves), elaio (fruits dispersed by ants), endozo (endozoochorous fruits), epizo (epizoochorous fruits), aquat (aquatic dispersal fruits), windgl (wind dispersed fruits), and unsp (unspecialized seed dispersal mechanism).*
+*The data I am using for data mining, classification, and prediction comes from the "plantTraits" dataset in R studio. I chose this dataset because it has 31 variables (including both numeric and binary variables) and 136 observations which opens up a lot of options for performing classification and prediction for specific variables or observations.* 
+
+*In order, the variables are pdias (diaspore mass in mg), longindex (seed bank longevity), durflow (flowering duration), height (plant height as an ordered factor), beglow (time of first flowering as an ordered factor), mycor (mycorrhizas-symbiotic relationship of plant and fungus-as an ordered factor), vegaer (aerial vegetative propagation as an ordered factor), vegsout (underground vegetative propagation as an ordered factor), autpoll (selfing pollination as an ordered factor), insects (insect pollination as an ordered factor), wind (wind pollination as an ordered factor), lign (woody plant), piq (thorny plant), ros (rosette plant), semiros (semi-rosette plant), leafy (leafy plant), suman (summer annual), winan (winter annual), monocarp (monocarpic perennial), polycarp (polycarpic perennial), seasaes (seasonal aestival leaves), seashiv (seasonal hibernal leaves), seasver (seasonal vernal leaves), everalw (evergreen leaves), everparti (partially evergreen leaves), elaio (fruits dispersed by ants), endozo (endozoochorous fruits), epizo (epizoochorous fruits), aquat (aquatic dispersal fruits), windgl (wind dispersed fruits), and unsp (unspecialized seed dispersal mechanism).*
 
 ```{R}
 library(tidyverse)
 plant_data<-read_csv("Plant Traits Data.csv")
 plant_data %>% glimpse()
 plant_data %>% summarize(n())
-sum(is.na(plant_data))
+sum(is.na(plant_data)) #need to remove NAs for clustering
 plant_data %>% na.omit -> plant_data
 plant_data %>% summarize(n())
 ```
@@ -68,32 +69,38 @@ plant_data %>% summarize(n())
 ```{R}
 library(cluster)
 clust_data<-plant_data%>%dplyr::select(2:32)
-clust_data
+clust_data %>% glimpse()
 
+#finding silhouette width
 sil_width<-vector()
 for(i in 2:10){  
-  kms <- kmeans(clust_data,centers=i)
-  sil <- silhouette(kms$cluster,dist(clust_data))
-  sil_width[i]<-mean(sil[,3])
+  kms <- pam(clust_data,k=i)
+  sil_width[i]<-kms$silinfo$avg.width
 }
 ggplot()+geom_line(aes(x=1:10,y=sil_width))+scale_x_continuous(name="k",breaks=1:10)
+
+#PAM clustering
 pamdata<-clust_data %>% pam(k=2)
 pamdata
 pamdata$clustering
 
-pam_data2 <- clust_data %>% mutate(cluster = as.factor(pamdata$clustering))
-pam_data2 %>% ggplot(aes(pdias,longindex,color=cluster)) + geom_point()
-plant_data%>%slice(pamdata$id.med)
-pam_data2 %>% group_by(cluster) %>% summarize_if(is.numeric,mean,na.rm=T)
-pamdata$silinfo$avg.width
-plot(pamdata,which=2) #greater than 0.71  a strong structure has been found
-
+#pairwise combinations
 library(GGally)
-ggpairs(pam_data2[1:10], aes(color=as.factor(pamdata$clustering)), upper=NULL)
+ggpairs_data <- clust_data %>% mutate(cluster = as.factor(pamdata$clustering))
+ggpairs(ggpairs_data[1:5], aes(color=as.factor(pamdata$clustering)), upper=NULL)
 #ggpairs(pam_data2, aes(color=as.factor(pamdata$clustering)), upper=NULL)
+
+pam_data2 <- plant_data %>% mutate(cluster = as.factor(pamdata$clustering))
+pam_data2 %>% filter(cluster==2)
+plant_data%>%slice(pamdata$id.med)
+#cluster means
+pam_data2 %>% group_by(cluster) %>% summarize_if(is.numeric,mean,na.rm=T)
+
+pamdata$silinfo$avg.width
+plot(pamdata,which=2) #greater than 0.71 (a strong structure has been found)
 ```
 
-*Discussion of clustering here*
+*Based on the graph of silhouette width vs k where the highest point is at k=2 it appears that two clusters best fits the data. Pam clustering revealed that the majority of the plant species fell under the first cluster, with only two observations (Corav and Prusi) making up the second cluster. The medoids of the clusters are Geuur for cluster 1 and Prusi for cluster 2. The mean values of the variables that help define the first cluster are a diaspore mass of 25.704 mg, seed bank longevity of 0.434, flowering duration of 3.368, ordered plant height of 3.566, ordered first flowering time of 5.263. The mean values of the variables that help define the second cluster are a diaspore mass of 1363.150 mg, seed bank longevity of 0.000, flowering duration of 3.500, plant height of 6.000, and ordered first flowering time of 2.000. (Only the first 5 out of 31 variables' cluster means are discussed here for the sake of brevity, but all 31 cluster means can be found under #cluster means). The goodness of fit is about 0.950, which is greater than 0.71 and indicates that a strong structure has been found in the cluster solution.*
     
     
 ### Dimensionality Reduction with PCA
@@ -104,33 +111,42 @@ rownames(plant_nums) <- plant_data$X1
 plant_nums
 plant_pca<-princomp(plant_nums)
 plant_pca %>% names()
-plant_pca$loadings
 plant_df<-data.frame(PC1=plant_pca$loadings[,1],PC2=plant_pca$loadings[,2])
-plant_df %>% head()
-ggplot(plant_df, aes(PC1,PC2)) + geom_point() #add title and stuff
+plant_df #%>% head()
 
+#variance
+summary(plant_pca, loadings = T)
+
+#visualization
+ggplot(plant_df, aes(PC1,PC2)) + geom_point() + ggtitle("PC2 vs PC1")
 library(factoextra)
-fviz_pca_biplot(plant_pca) #sick
+fviz_pca_biplot(plant_pca)
 ```
 
-Discussions of PCA here. 
+*The numeric variables were scaled before performing PCA because of the variation in range of each variable. In this case, scoring high on PC1 means that the plant species has a greater diaspore mass, shorter seed bank longevity, shorter flowering duration, greater height, slightly lower first flowering time value, greater mycorrhizas value, slightly less aerial vegetative propagation, greater underground vegetative propagation, lower chances of selfing pollination, and slightly greater chance of insect pollination. Scoring high on PC2 means that the plant species has a smaller diaspore mass, slightly longer seed bank longevity, longer flowering duration, greater height, slightly lower first flowering time value, slightly flower mycorrhizas value, less aerial vegetative propagation, slightly less underground vegetative propagation, greater chance of selfing pollination, and slight chance of insect pollination. (Only the first 10 out of 31 PC1 values are discussed here for the purpose of brevity and clarity)*
+*The total variance of the dataset that is explained by PC1 and PC2 is only 28.584%. Each principle component only accounts for a small amount of variation in the dataset. It would take five principle components to encompass 50% of the total variance.*
 
 ###  Linear Classifier
 
 ```{R}
-fit <- glm(leafy ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, family="binomial")
-score <- predict(fit)
-score %>% round(3)
-class_diag(score,truth=plant_data$leafy, positive=1) #HMMMMMMM
+fit_lc <- glm(leafy ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, family="binomial")
+score_lc <- predict(fit_lc)
+score_lc %>% round(3)
+class_diag(score_lc,truth=plant_data$leafy, positive=1)
 
 library(caret)
-knn_fit<-knn3(factor(leafy==1,levels=c("TRUE","FALSE")) ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, k=5)
-y_hat_knn<-predict(knn_fit,plant_data)
+knn_fit<- knn3(factor(leafy==1,levels=c("TRUE","FALSE")) ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, k=5)
+y_hat_knn <- predict(knn_fit,plant_data)
 y_hat_knn
-#NEEDS A CONFUSION MATRIX???
+
+#confusion matrix
+table(truth= factor(plant_data$leafy==1, levels=c("TRUE","FALSE")), prediction= factor(y_hat_knn[,1]>0.5, levels=c("TRUE","FALSE")))
+class_diag(y_hat_knn[,1], plant_data$leafy, positive=1)
 ```
+*Using logistic regression to predict the variable "leafy" from the the first ten variables in the dataset yields an AUC of about 0.868 and indicates that the logistic regression model is making fairly accurate predictions. *
 
 ```{R}
+set.seed(123)
 k=10
 data<-plant_data[sample(nrow(plant_data)),]
 folds<-cut(seq(1:nrow(plant_data)),breaks=k,labels=F)
@@ -140,105 +156,102 @@ for(i in 1:k){
   test<-data[folds==i,]
   truth<-test$leafy
 }
-fit2 <- glm(leafy~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=train, family="binomial")
-probs<-predict(fit,newdata = test,type="response")
-diags<-rbind(diags,class_diag(probs,truth, positive=1))
+fit_lc2 <- glm(leafy~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=train, family="binomial")
+probs_lc2<-predict(fit_lc2,newdata=test,type="response")
+diags<-rbind(diags,class_diag(probs_lc2,truth,positive=1))
 summarize_all(diags,mean)
 ```
 
-Discussion here
+*After performing cross validation the AUC of the model is 0.8 (for seed 123). The AUC decreased in comparison to the original logistic regression model indicating that the model may be overfitting.*
 
 ### Non-Parametric Classifier
 
 ```{R}
-library(caret)
-if (plant_data$leafy==1) {print ("leafy") } else {print ("not leafy") }
 plant_data$leafyTF <- ifelse(plant_data$leafy == 1, "leafy", "not_leafy")
-plant_data %>% glimpse()
-fit_npc<-train(leafyTF~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, method="rpart")
+plant_data %>% select(leafy,leafyTF) %>% head()
+
+#classification tree
+fit_npc <- train(leafyTF~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, method="rpart")
 library(rpart.plot)
-fit_npc
+fit_npc$bestTune
 rpart.plot(fit_npc$finalModel,digits=4)
+
+#AUC
 class_diag(predict(fit_npc,type="prob")[,2], plant_data$leafyTF, positive="leafy")
-#FIT MODEL TO DATASET
-cv <- trainControl(method="cv", number= 10, classProbs = T, savePredictions = T)
-fit_npc2 <- train(leafyTF ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, trControl=cv, method="rpart")
-fit_npc2$pred
-class_diag(fit_npc2$pred$leafy, fit_npc2$pred$obs, positive="leafy")
-#full model confusion matrix
-table(actual=plant_data$leafyTF,pred=predict(fit_npc2))[c(2,1),c(2,1)]
+
+#confusion matrix
+table(actual=plant_data$leafyTF,pred=predict(fit_npc))[c(2,1),c(2,1)]
 ```
 
 ```{R}
-k=10
-data_npc<-plant_data[sample(nrow(plant_data)),]
-folds_npc<-cut(seq(1:nrow(plant_data)),breaks=k,labels=F)
-diags_npc<-NULL
-for(i in 1:k){
-  train_npc<-data[folds!=i,]
-  test_npc<-data[folds==i,]
-  truth_npc<-test$leafy
-}
-fit_npc3 <- knn3(leafy~pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=train_npc)
-probs_npc<-predict(fit_npc3,newdata = test_npc)[,2]
-diags_npc<-rbind(diags_npc,class_diag(probs_npc,truth_npc, positive=1))
-summarize_all(diags_npc,mean)
+#cross validation
+set.seed(123)
+cv <- trainControl(method="cv", number=10, classProbs= T, savePredictions = T)
+fit_npc_cv <- train(leafyTF ~ pdias+longindex+durflow+height+begflow+mycor+vegaer+vegsout+autopoll+insects, data=plant_data, trControl=cv, method="rpart")
+class_diag(fit_npc_cv$pred$leafy, fit_npc_cv$pred$obs, positive="leafy")
 ```
 
-Discussion
-
+*To predict "leafy" with a non-parametric classifier I used a classification tree. The classification tree shows that the first two splits for determining "leafy" come from the variable "height" and "vegsout". If the plant species is taller (greater than or equal to the ordered height value of 5) then it is predicted to be leafy. If the plant species is shorter than or equal to 5 but has important underground vegetative propagation (vegsout greater than or equal to 2) then the plant species is predicted to be leafy. Otherwise it is predicted to not be leafy.*
+*This model yielded a very low AUC of 0.208. The AUC from cross validation of the classification tree increased in comparison, being approximately 0.600 (for seed 123). This seems to indicate that the model is not overfitting, however it is generally poor at predicting whether or not a plant species will be leafy.*
 
 ### Regression/Numeric Prediction
 
 ```{R}
 fit_lr <- lm(height~pdias+longindex+durflow+begflow+mycor+vegaer+vegsout+autopoll+insects,data=plant_data)
 yhat_lr <- predict(fit_lr)
-mean((plant_data$height-yhat_lr)^2)
+mean((plant_data$height-yhat_lr)^2) #MSE
 ```
 
 ```{R}
+#cross validation
+set.seed(123)
 k=10
 data_lr <- plant_data[sample(nrow(plant_data)),]
 folds_lr <- cut(seq(1:nrow(plant_data)),breaks=k,label=F)
-diags_lr <- NULL
+MSE <- NULL
+
 for(i in 1:k){
   train_lr <- data[folds!=i,]
   test_lr <- data[folds==i,]
+  truth<-test_lr$height
+  
   fit_lrcv <- lm(height~pdias+longindex+durflow+begflow+mycor+vegaer+vegsout+autopoll+insects,data=train)
   yhat_lrcv <- predict(fit_lrcv,newdata=test_lr)
-  diags <- mean((test_lr$height-yhat_lrcv))
+  MSE <- cbind(MSE,mean((truth-yhat_lrcv)^2))
 }
-mean(diags)
+mean(MSE)
 ```
 
-Discussion
+*The MSE of the linear regression model is approximately 2.120. After performing cross validation the average MSE is about 2.257 (for seed 123). Since the MSE increased in cross validation this indicates that the linear regression model is overfitting.*
 
 ### Python 
 
 ```{R}
 library(reticulate)
 use_python("/usr/bin/python3")
+#py_install("matplotlib")
+#py_install("pandas")
+#py_install("numpy")
+#py_install("sklearn.cluster")
 
 cat(py$hi)
-cat(py$beep)
-cat(py$y_means)
+cat(py$leafy_py) 
 ```
 
 ```{python}
-hi="world"
-beep="boop"
+hi="hello world"
+r.plant_data.head()
+r.plant_data["leafy"].head()
+leafy_py=r.plant_data["leafy"]
 ```
 
+*Using python and reticulate I opened the plant_data dataset in a python code chunk, indexed the variable "leafy", and then assigned it to "leafy_py". Then I accessed "leafy_py" in an r code chunk using py$.*
 
 ```{python}
 
 ```
 
-Discussion
-
-### Concluding Remarks
-
-*Include concluding remarks here, if any*
+**
 
 ###Source
 Vallet, Jeanne (2005) Structuration de communautés végétales et analyse comparative de traits biologiques le long d'un gradient d'urbanisation. Mémoire de Master 2 'Ecologie-Biodiversité-Evolution'; Université Paris Sud XI, 30p.+ annexes (in french)
